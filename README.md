@@ -32,7 +32,30 @@ Menampilkan informasi:
 - Proses pembayaran
 - Cetak bukti pembayaran PDF
 
-### 5. **Telegram Notifications** 🆕
+### 5. **Insurance Discount System** 🆕
+- ✅ **Diskon Asuransi Otomatis** - Diskon langsung dari asuransi (60-100%)
+- ✅ **Voucher Code Manual** - Prioritas tertinggi saat diinput manual
+- ✅ **Auto Voucher** - Otomatis pilih voucher terbaik jika ada
+- ✅ **Coverage Limit** - Batas maksimal tanggungan asuransi
+- ✅ **Preserve Discount** - Diskon tidak hilang saat sync API
+
+**Priority Diskon:**
+1. Manual Voucher Code (jika diinput kasir)
+2. Insurance Discount Percentage (diskon langsung dari asuransi)
+3. Auto Voucher dari Insurance (jika tidak ada diskon percentage)
+
+**Contoh Diskon Aktif:**
+- BPJS Kesehatan: 100% (gratis total)
+- Mandiri Inhealth: 90%
+- Allianz Indonesia: 85%
+- Prudential: 75%
+
+**Set/Update Diskon:**
+```bash
+php artisan insurance:update-discounts
+```
+
+### 6. **Telegram Notifications** 🆕
 - ✅ **Laporan Harian Otomatis** via Telegram
 - ✅ **Manual Report** - Kirim kapan saja ke Telegram
 - ✅ **Test Connection** - Verifikasi bot setup
@@ -52,6 +75,24 @@ Menampilkan informasi:
 - Otomatis berjalan setiap jam 01:00 dini hari
 - Mengirim laporan transaksi kemarin dalam format Excel ke **Telegram**
 - Notifikasi: https://t.me/masohdir
+
+### 7. **API Integration - RS Delta Surya** 🆕
+- ✅ **Sync Insurance** - Sinkronisasi data asuransi dari API eksternal
+- ✅ **Sync Medical Services** - Sinkronisasi layanan & harga terbaru
+- ✅ **Price Cache** - Harga tersimpan di database (40-100x lebih cepat)
+- ✅ **Smart Preservation** - Diskon asuransi **TIDAK tertimpa** saat sync API
+- ✅ **Auto Fallback** - Gunakan harga database jika API gagal
+
+**PENTING:** Sejak update terbaru, `discount_percentage` pada insurance akan **dipertahankan** saat sync API. Hanya `name` dan `description` yang diupdate dari API eksternal. Ini mencegah diskon yang sudah diset manual hilang saat sync.
+
+**Manual Sync:**
+```bash
+# Sync semua data
+php artisan api:sync-all
+
+# Atau dari dashboard Marketing
+Dashboard → "🔄 Sync Data dari API"
+```
 
 ## Tech Stack
 

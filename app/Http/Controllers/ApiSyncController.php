@@ -38,19 +38,25 @@ class ApiSyncController extends Controller
             try {
                 foreach ($insurances as $insuranceData) {
                     // API returns: {"id": "uuid", "name": "Insurance Name"}
-                    $insurance = Insurance::updateOrCreate(
-                        ['code' => $insuranceData['id']], // Use ID as code
-                        [
+                    $existing = Insurance::where('code', $insuranceData['id'])->first();
+                    
+                    if ($existing) {
+                        // Update existing: preserve discount_percentage, only update name & description
+                        $existing->update([
+                            'name' => $insuranceData['name'],
+                            'description' => $insuranceData['description'] ?? null,
+                            // discount_percentage NOT updated - preserve manual settings
+                        ]);
+                        $updatedCount++;
+                    } else {
+                        // Create new: use default discount from API
+                        Insurance::create([
+                            'code' => $insuranceData['id'],
                             'name' => $insuranceData['name'],
                             'discount_percentage' => $insuranceData['discount_percentage'] ?? 0,
                             'description' => $insuranceData['description'] ?? null,
-                        ]
-                    );
-
-                    if ($insurance->wasRecentlyCreated) {
+                        ]);
                         $syncedCount++;
-                    } else {
-                        $updatedCount++;
                     }
                 }
 
@@ -154,18 +160,22 @@ class ApiSyncController extends Controller
                 DB::beginTransaction();
                 try {
                     foreach ($insurances as $insuranceData) {
-                        $insurance = Insurance::updateOrCreate(
-                            ['code' => $insuranceData['code'] ?? $insuranceData['id']],
-                            [
+                        $existing = Insurance::where('code', $insuranceData['code'] ?? $insuranceData['id'])->first();
+                        
+                        if ($existing) {
+                            // Preserve discount_percentage for existing insurances
+                            $existing->update([
+                                'name' => $insuranceData['name'],
+                            ]);
+                            $updatedCount++;
+                        } else {
+                            // Set default discount for new insurances
+                            Insurance::create([
+                                'code' => $insuranceData['code'] ?? $insuranceData['id'],
                                 'name' => $insuranceData['name'],
                                 'discount_percentage' => $insuranceData['discount_percentage'] ?? 0,
-                            ]
-                        );
-
-                        if ($insurance->wasRecentlyCreated) {
+                            ]);
                             $syncedCount++;
-                        } else {
-                            $updatedCount++;
                         }
                     }
                     DB::commit();

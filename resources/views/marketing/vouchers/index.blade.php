@@ -68,7 +68,7 @@
                                             @endif
                                         </td>
                                         <td class="px-6 py-4">
-                                            {{ $voucher->insurance?->name ?? '<span class="text-gray-500 italic">Voucher Umum</span>' }}
+                                            {{ $voucher->insurance?->name ?? 'Voucher Umum' }}
                                         </td>
                                         <td class="px-6 py-4">
                                             @if($voucher->discount_type === 'percentage')
