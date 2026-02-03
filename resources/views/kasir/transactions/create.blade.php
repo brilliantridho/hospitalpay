@@ -127,9 +127,9 @@
                                     <div class="subtotal-display text-sm font-semibold text-gray-700 mt-2 hidden"></div>
                                 </div>
                             </div>
-                            <button type="button" id="add-service" class="bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded mt-2">
+                            <!-- <button type="button" id="add-service" class="bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded mt-2">
                                 Tambah Layanan
-                            </button>
+                            </button> -->
                         </div>
 
                         <div class="mb-6 p-4 bg-gray-50 rounded">
