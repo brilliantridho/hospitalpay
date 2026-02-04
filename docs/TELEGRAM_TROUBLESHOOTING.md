@@ -13,7 +13,7 @@ Chat ID di `.env` salah atau bot belum pernah menerima pesan dari Anda.
 
 ### Cara 1: Menggunakan Command Helper (Termudah!)
 
-1. **Buka Telegram**, cari bot Anda: `@masbrill_bot`
+1. **Buka Telegram**, cari bot Anda: `@your_bot_username`
 2. Klik **Start** dan kirim pesan: `hello`
 3. **Jalankan command:**
    ```bash
@@ -34,17 +34,17 @@ Chat ID di `.env` salah atau bot belum pernah menerima pesan dari Anda.
 1. Buka Telegram, cari `@userinfobot`
 2. Klik **Start**
 3. Bot akan kirim info Anda, copy **Id** (angka)
-4. **PENTING:** Buka bot Anda `@masbrill_bot`, klik **Start** dan kirim pesan
+4. **PENTING:** Buka bot Anda `@your_bot_username`, klik **Start** dan kirim pesan
 5. Update `.env` dengan Chat ID tersebut
 6. Reload config: `php artisan config:clear`
 
 ### Cara 3: Manual via Browser
 
-1. Buka bot `@masbrill_bot` di Telegram
+1. Buka bot `@your_bot_username` di Telegram
 2. Klik **Start** dan kirim pesan `hello`
 3. Buka browser, akses:
    ```
-   https://api.telegram.org/bot8538759033:AAEMAVeqjnuqW5-cQfo0N64p66qZ_m15mY4/getUpdates
+   https://api.telegram.org/bot<YOUR_BOT_TOKEN>/getUpdates
    ```
 4. Cari `"chat":{"id":1234567890}` di response JSON
 5. Copy angka Chat ID tersebut
@@ -88,10 +88,10 @@ php artisan tinker
 ## Kesalahan Umum
 
 ### ❌ Chat ID dari @userinfobot tapi tidak start bot
-**Solusi:** Harus buka `@masbrill_bot` dan klik Start + kirim pesan
+**Solusi:** Harus buka `@your_bot_username` dan klik Start + kirim pesan
 
 ### ❌ Chat ID menggunakan angka negatif untuk personal chat
-**Solusi:** Personal chat ID selalu positif (contoh: 1868709569)
+**Solusi:** Personal chat ID selalu positif (contoh: 123456789)
 Angka negatif hanya untuk group (contoh: -1001234567890)
 
 ### ❌ Copy Chat ID dengan spasi atau karakter lain
@@ -138,8 +138,8 @@ php artisan config:clear
 
 ## Contact Support
 
-- Bot Username: @masbrill_bot
-- Token (first 10 chars): 8538759033...
-- Current Chat ID di .env: 1868709569
+- Bot Username: @your_bot_username
+- Token: Use your own bot token from @BotFather
+- Current Chat ID di .env: your_chat_id
 
 Jika masih ada masalah, screenshot error dan kirim!
