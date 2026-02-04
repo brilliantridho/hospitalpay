@@ -52,7 +52,7 @@ class SendDailyTransactionReport extends Command
         }
 
         // Generate Excel file
-        $fileName = 'transactions_' . $yesterday->format('Y-m-d') . '.xlsx';
+        $fileName = 'payment_reports_' . $yesterday->format('Y-m-d') . '.xlsx';
         $filePath = 'reports/' . $fileName;
         
         // Ensure reports directory exists

@@ -17,8 +17,8 @@
                     </x-nav-link>
                     
                     @if(auth()->user()->role === 'marketing')
-                        <x-nav-link :href="route('marketing.vouchers.index')" :active="request()->routeIs('marketing.vouchers.*')">
-                            {{ __('Voucher') }}
+                        <x-nav-link :href="route('marketing.insurances.index')" :active="request()->routeIs('marketing.insurances.*')">
+                            {{ __('Asuransi') }}
                         </x-nav-link>
                     @endif
                     

@@ -51,6 +51,8 @@ Route::middleware(['auth', 'role:marketing'])->prefix('marketing')->name('market
     Route::resource('vouchers', VoucherController::class);
     Route::get('/insurances', [MarketingInsuranceController::class, 'index'])->name('insurances.index');
     Route::get('/insurances/{insurance}', [MarketingInsuranceController::class, 'show'])->name('insurances.show');
+    Route::get('/insurances/{insurance}/edit', [MarketingInsuranceController::class, 'edit'])->name('insurances.edit');
+    Route::put('/insurances/{insurance}', [MarketingInsuranceController::class, 'update'])->name('insurances.update');
 });
 
 // Kasir Routes
@@ -59,6 +61,11 @@ Route::middleware(['auth', 'role:kasir'])->prefix('kasir')->name('kasir.')->grou
     Route::post('transactions/{transaction}/pay', [TransactionController::class, 'pay'])->name('transactions.pay');
     Route::get('transactions/{transaction}/print', [TransactionController::class, 'printReceipt'])->name('transactions.print');
     Route::post('transactions/check-voucher', [TransactionController::class, 'checkVoucher'])->name('transactions.check-voucher');
+    
+    // Test voucher page
+    Route::get('test-voucher', function () {
+        return view('test-voucher');
+    })->name('test-voucher');
 });
 
 require __DIR__.'/auth.php';

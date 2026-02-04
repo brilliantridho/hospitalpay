@@ -8,9 +8,9 @@ Artisan::command('inspire', function () {
     $this->comment(Inspiring::quote());
 })->purpose('Display an inspiring quote');
 
-// Schedule daily transaction report at 16:10 (4:10 PM) - TESTING
+// Schedule daily transaction report at 01:00 AM
 Schedule::command('report:send-daily-transactions')
-    ->dailyAt('16:30')
+    ->dailyAt('01:00')
     ->timezone('Asia/Jakarta')
     ->emailOutputOnFailure(config('mail.from.address'));
 

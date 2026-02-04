@@ -93,11 +93,17 @@
                                 </div>
                             @endif
 
-                            <!-- View Details Button -->
-                            <a href="{{ route('marketing.insurances.show', $insurance) }}" 
-                               class="block w-full text-center bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded text-sm transition-colors">
-                                Lihat Detail
-                            </a>
+                            <!-- Action Buttons -->
+                            <div class="flex gap-2">
+                                <a href="{{ route('marketing.insurances.show', $insurance) }}" 
+                                   class="flex-1 text-center bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded text-sm transition-colors">
+                                    Lihat Detail
+                                </a>
+                                <a href="{{ route('marketing.insurances.edit', $insurance) }}" 
+                                   class="flex-1 text-center bg-amber-500 hover:bg-amber-700 text-white font-bold py-2 px-4 rounded text-sm transition-colors">
+                                    Edit Diskon
+                                </a>
+                            </div>
                         </div>
                     </div>
                 @endforeach

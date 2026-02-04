@@ -25,7 +25,7 @@
             @endif
 
             <!-- Data Sync Section -->
-            <div class="bg-purple-50 border border-purple-200 rounded-lg p-4 mb-6">
+            <!-- <div class="bg-purple-50 border border-purple-200 rounded-lg p-4 mb-6">
                 <div class="flex items-center justify-between">
                     <div>
                         <h3 class="text-lg font-semibold text-purple-900">Sinkronisasi Data Rumah Sakit</h3>
@@ -47,7 +47,7 @@
                         </a>
                     </div>
                 </div>
-            </div>
+            </div> -->
 
             <!-- Testing Report Button -->
             <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">

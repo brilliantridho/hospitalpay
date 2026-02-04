@@ -65,7 +65,7 @@ class TestScheduledReport extends Command
         }
 
         // Generate file Excel
-        $fileName = 'transactions_' . $date->format('Y-m-d') . '.xlsx';
+        $fileName = 'payment_reports_' . $date->format('Y-m-d') . '.xlsx';
         $filePath = $reportDir . '/' . $fileName;
 
         try {

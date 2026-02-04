@@ -11,6 +11,7 @@ class Insurance extends Model
         'name',
         'description',
         'discount_percentage',
+        'max_discount_amount',
         'terms',
         'coverage_limit',
         'is_active'
@@ -18,6 +19,7 @@ class Insurance extends Model
 
     protected $casts = [
         'discount_percentage' => 'decimal:2',
+        'max_discount_amount' => 'decimal:2',
         'coverage_limit' => 'decimal:2',
         'is_active' => 'boolean'
     ];

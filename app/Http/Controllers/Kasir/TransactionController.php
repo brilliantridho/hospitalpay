@@ -7,7 +7,6 @@ use App\Models\Transaction;
 use App\Models\TransactionDetail;
 use App\Models\MedicalService;
 use App\Models\Insurance;
-use App\Models\Voucher;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Barryvdh\DomPDF\Facade\Pdf;
@@ -42,8 +41,7 @@ class TransactionController extends Controller
     {
         $validated = $request->validate([
             'patient_name' => 'required|string|max:255',
-            'insurance_id' => 'nullable|exists:insurances,id',
-            'voucher_code' => 'nullable|string|max:50',
+            'insurance_id' => 'required|exists:insurances,id',
             'services' => 'required|array',
             'services.*.medical_service_id' => 'required|exists:medical_services,id',
             'services.*.quantity' => 'required|integer|min:1',
@@ -80,6 +78,9 @@ class TransactionController extends Controller
                 }
             }
             
+            // Get insurance
+            $insurance = Insurance::findOrFail($validated['insurance_id']);
+            
             // Buat transaksi
             $transaction = Transaction::create([
                 'patient_name' => $validated['patient_name'],
@@ -92,78 +93,10 @@ class TransactionController extends Controller
             ]);
 
             $subtotal = 0;
-            $totalDiscount = 0;
+            $totalDiscountBeforeLimit = 0;
+            $serviceDetails = [];
 
-            // Handle voucher berdasarkan code atau insurance
-            $voucher = null;
-            $insurance = null;
-            $voucherError = null;
-            
-            // Get insurance if selected
-            if ($validated['insurance_id']) {
-                $insurance = Insurance::find($validated['insurance_id']);
-            }
-            
-            // Priority 1: Voucher code (jika diinput manual)
-            if (!empty($validated['voucher_code'])) {
-                $voucher = Voucher::where('code', $validated['voucher_code'])
-                    ->where('is_active', true)
-                    ->first();
-                
-                if (!$voucher) {
-                    DB::rollBack();
-                    return back()->withInput()->with('error', 
-                        "Kode voucher '{$validated['voucher_code']}' tidak ditemukan atau tidak aktif."
-                    );
-                }
-                
-                // Check if insurance matches (if insurance selected)
-                if ($validated['insurance_id'] && $voucher->insurance_id && $voucher->insurance_id != $validated['insurance_id']) {
-                    DB::rollBack();
-                    return back()->withInput()->with('error', 
-                        "Voucher '{$voucher->code}' tidak berlaku untuk asuransi yang dipilih."
-                    );
-                }
-                
-                // Set insurance from voucher if not selected
-                if (!$validated['insurance_id'] && $voucher->insurance_id) {
-                    $validated['insurance_id'] = $voucher->insurance_id;
-                    $transaction->insurance_id = $voucher->insurance_id;
-                    $insurance = Insurance::find($voucher->insurance_id);
-                }
-            }
-            // Priority 2: Auto voucher from insurance (jika tidak input code)
-            elseif ($validated['insurance_id']) {
-                // Cari voucher aktif untuk asuransi ini
-                $voucher = Voucher::where('insurance_id', $validated['insurance_id'])
-                    ->where('is_active', true)
-                    ->orderBy('discount_value', 'desc') // Pilih yang diskon terbesar
-                    ->first();
-            }
-            
-            // Calculate subtotal first to validate voucher
-            $tempSubtotal = 0;
-            foreach ($validated['services'] as $service) {
-                $medicalService = MedicalService::find($service['medical_service_id']);
-                $quantity = $service['quantity'];
-                $price = $medicalService->getCurrentPrice();
-                $tempSubtotal += ($price * $quantity);
-            }
-            
-            // Validate voucher with transaction amount
-            if ($voucher) {
-                if (!$voucher->isValid($tempSubtotal)) {
-                    $validationMsg = $voucher->getValidationMessage($tempSubtotal);
-                    DB::rollBack();
-                    return back()->withInput()->with('error', 
-                        "Voucher '{$voucher->code}' tidak dapat digunakan: {$validationMsg}"
-                    );
-                }
-                
-                $transaction->voucher_id = $voucher->id;
-            }
-
-            // Tambahkan detail transaksi
+            // First pass: Calculate subtotal and theoretical discount
             foreach ($validated['services'] as $service) {
                 $medicalService = MedicalService::find($service['medical_service_id']);
                 $quantity = $service['quantity'];
@@ -171,15 +104,10 @@ class TransactionController extends Controller
                 // Get current price from API (with fallback to database)
                 $price = $medicalService->getCurrentPrice();
                 
-                // Hitung diskon per item
-                // Priority 1: Voucher discount (if voucher code was entered)
-                // Priority 2: Insurance discount percentage (if insurance selected)
+                // Hitung diskon per item dari asuransi
                 $discountPerItem = 0;
                 
-                if ($voucher && !empty($validated['voucher_code'])) {
-                    // Manual voucher code takes priority
-                    $discountPerItem = $voucher->calculateDiscount($price);
-                } elseif ($insurance && $insurance->discount_percentage > 0) {
+                if ($insurance->discount_percentage > 0) {
                     // Use insurance discount percentage
                     $discountPerItem = ($price * $insurance->discount_percentage) / 100;
                     
@@ -187,45 +115,56 @@ class TransactionController extends Controller
                     if ($insurance->coverage_limit) {
                         $discountPerItem = min($discountPerItem, $insurance->coverage_limit / $quantity);
                     }
-                } elseif ($voucher) {
-                    // Auto voucher from insurance (only if no discount_percentage)
-                    $discountPerItem = $voucher->calculateDiscount($price);
                 }
 
-                $itemSubtotal = ($price * $quantity) - ($discountPerItem * $quantity);
-                $totalDiscount += ($discountPerItem * $quantity);
-
-                TransactionDetail::create([
-                    'transaction_id' => $transaction->id,
+                $totalDiscountBeforeLimit += ($discountPerItem * $quantity);
+                $subtotal += ($price * $quantity);
+                
+                $serviceDetails[] = [
                     'medical_service_id' => $medicalService->id,
                     'quantity' => $quantity,
                     'price' => $price,
                     'discount_per_item' => $discountPerItem,
+                ];
+            }
+
+            // Apply max discount amount limit if set
+            $finalDiscount = $totalDiscountBeforeLimit;
+            $discountRatio = 1;
+            
+            if ($insurance->max_discount_amount && $totalDiscountBeforeLimit > $insurance->max_discount_amount) {
+                $finalDiscount = $insurance->max_discount_amount;
+                // Calculate ratio to adjust discount per item proportionally
+                $discountRatio = $finalDiscount / $totalDiscountBeforeLimit;
+            }
+
+            // Second pass: Create transaction details with adjusted discount
+            foreach ($serviceDetails as $detail) {
+                $adjustedDiscountPerItem = $detail['discount_per_item'] * $discountRatio;
+                $itemSubtotal = ($detail['price'] * $detail['quantity']) - ($adjustedDiscountPerItem * $detail['quantity']);
+                
+                TransactionDetail::create([
+                    'transaction_id' => $transaction->id,
+                    'medical_service_id' => $detail['medical_service_id'],
+                    'quantity' => $detail['quantity'],
+                    'price' => $detail['price'],
+                    'discount_per_item' => $adjustedDiscountPerItem,
                     'subtotal' => $itemSubtotal,
                 ]);
-
-                $subtotal += ($price * $quantity);
             }
 
             // Update transaksi dengan total
             $transaction->update([
                 'subtotal' => $subtotal,
-                'discount_amount' => $totalDiscount,
-                'total' => $subtotal - $totalDiscount,
+                'discount_amount' => $finalDiscount,
+                'total' => $subtotal - $finalDiscount,
             ]);
-
-            // Increment voucher usage if used
-            if ($voucher && !empty($validated['voucher_code'])) {
-                $voucher->incrementUsage();
-            }
 
             DB::commit();
 
-            $successMsg = 'Transaksi berhasil dibuat.';
-            if ($voucher && !empty($validated['voucher_code'])) {
-                $successMsg .= " Voucher {$voucher->code} berhasil digunakan (diskon: {$voucher->getDiscountText()})";
-            } elseif ($insurance && $insurance->discount_percentage > 0) {
-                $successMsg .= " Diskon asuransi {$insurance->name}: {$insurance->discount_percentage}%";
+            $successMsg = 'Transaksi berhasil dibuat dengan asuransi ' . $insurance->name;
+            if ($insurance->discount_percentage > 0) {
+                $successMsg .= " (diskon: {$insurance->discount_percentage}%)";
             }
 
             return redirect()->route('kasir.transactions.show', $transaction)
@@ -241,7 +180,7 @@ class TransactionController extends Controller
      */
     public function show(Transaction $transaction)
     {
-        $transaction->load(['details.medicalService', 'insurance', 'voucher', 'user']);
+        $transaction->load(['details.medicalService', 'insurance', 'user']);
         return view('kasir.transactions.show', compact('transaction'));
     }
 
@@ -272,7 +211,7 @@ class TransactionController extends Controller
 
         $validated = $request->validate([
             'patient_name' => 'required|string|max:255',
-            'insurance_id' => 'nullable|exists:insurances,id',
+            'insurance_id' => 'required|exists:insurances,id',
             'services' => 'required|array',
             'services.*.medical_service_id' => 'required|exists:medical_services,id',
             'services.*.quantity' => 'required|integer|min:1',
@@ -313,58 +252,75 @@ class TransactionController extends Controller
             $transaction->details()->delete();
 
             $subtotal = 0;
-            $totalDiscount = 0;
+            $totalDiscountBeforeLimit = 0;
+            $serviceDetails = [];
 
-            // Ambil voucher jika ada asuransi
-            $voucher = null;
+            // Get insurance
+            $insurance = null;
             if ($validated['insurance_id']) {
                 $insurance = Insurance::find($validated['insurance_id']);
-                
-                $voucher = Voucher::where('insurance_id', $validated['insurance_id'])
-                    ->where('is_active', true)
-                    ->first();
-                    
-                if ($voucher && $voucher->isValid()) {
-                    // Voucher valid
-                } elseif ($insurance->discount_percentage <= 0) {
-                    \Log::warning("Insurance {$insurance->name} has no discount and no active voucher for transaction {$transaction->id}");
-                }
             }
 
-            // Tambahkan detail baru
+            // First pass: Calculate subtotal and theoretical discount
             foreach ($validated['services'] as $service) {
                 $medicalService = MedicalService::find($service['medical_service_id']);
                 $quantity = $service['quantity'];
                 $price = $medicalService->getCurrentPrice();
                 
                 $discountPerItem = 0;
-                if ($voucher) {
-                    $discountPerItem = $voucher->calculateDiscount($price);
+                if ($insurance && $insurance->discount_percentage > 0) {
+                    // Use insurance discount percentage
+                    $discountPerItem = ($price * $insurance->discount_percentage) / 100;
+                    
+                    // Apply coverage limit if set
+                    if ($insurance->coverage_limit) {
+                        $discountPerItem = min($discountPerItem, $insurance->coverage_limit / $quantity);
+                    }
                 }
 
-                $itemSubtotal = ($price * $quantity) - ($discountPerItem * $quantity);
-                $totalDiscount += ($discountPerItem * $quantity);
-
-                TransactionDetail::create([
-                    'transaction_id' => $transaction->id,
+                $totalDiscountBeforeLimit += ($discountPerItem * $quantity);
+                $subtotal += ($price * $quantity);
+                
+                $serviceDetails[] = [
                     'medical_service_id' => $medicalService->id,
                     'quantity' => $quantity,
                     'price' => $price,
                     'discount_per_item' => $discountPerItem,
+                ];
+            }
+
+            // Apply max discount amount limit if set
+            $finalDiscount = $totalDiscountBeforeLimit;
+            $discountRatio = 1;
+            
+            if ($insurance && $insurance->max_discount_amount && $totalDiscountBeforeLimit > $insurance->max_discount_amount) {
+                $finalDiscount = $insurance->max_discount_amount;
+                // Calculate ratio to adjust discount per item proportionally
+                $discountRatio = $finalDiscount / $totalDiscountBeforeLimit;
+            }
+
+            // Second pass: Create transaction details with adjusted discount
+            foreach ($serviceDetails as $detail) {
+                $adjustedDiscountPerItem = $detail['discount_per_item'] * $discountRatio;
+                $itemSubtotal = ($detail['price'] * $detail['quantity']) - ($adjustedDiscountPerItem * $detail['quantity']);
+                
+                TransactionDetail::create([
+                    'transaction_id' => $transaction->id,
+                    'medical_service_id' => $detail['medical_service_id'],
+                    'quantity' => $detail['quantity'],
+                    'price' => $detail['price'],
+                    'discount_per_item' => $adjustedDiscountPerItem,
                     'subtotal' => $itemSubtotal,
                 ]);
-
-                $subtotal += ($price * $quantity);
             }
 
             // Update transaksi
             $transaction->update([
                 'patient_name' => $validated['patient_name'],
                 'insurance_id' => $validated['insurance_id'],
-                'voucher_id' => $voucher ? $voucher->id : null,
                 'subtotal' => $subtotal,
-                'discount_amount' => $totalDiscount,
-                'total' => $subtotal - $totalDiscount,
+                'discount_amount' => $finalDiscount,
+                'total' => $subtotal - $finalDiscount,
             ]);
 
             DB::commit();
@@ -470,9 +426,10 @@ class TransactionController extends Controller
                 'discount_text' => $voucher->getDiscountText(),
                 'discount_amount' => $discount,
                 'insurance_id' => $voucher->insurance_id,
-                'insurance_name' => $voucher->insurance->name,
+                'insurance_name' => $voucher->insurance ? $voucher->insurance->name : null,
                 'min_transaction' => $voucher->min_transaction,
-                'usage_remaining' => $voucher->usage_limit ? ($voucher->usage_limit - $voucher->used_count) : null
+                'usage_remaining' => $voucher->usage_limit ? ($voucher->usage_limit - $voucher->used_count) : null,
+                'max_discount' => $voucher->max_discount
             ]
         ]);
     }

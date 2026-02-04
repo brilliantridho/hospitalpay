@@ -25,16 +25,25 @@
 
                         <div class="mb-6">
                             <label class="block text-gray-700 text-sm font-bold mb-2" for="insurance_id">
-                                Asuransi (opsional)
+                                Asuransi *
                             </label>
-                            <select name="insurance_id" id="insurance_id" class="shadow border rounded w-full py-2 px-3 text-gray-700">
-                                <option value="">Tidak Pakai Asuransi</option>
+                            <select name="insurance_id" id="insurance_id" class="shadow border rounded w-full py-2 px-3 text-gray-700 @error('insurance_id') border-red-500 @enderror" required>
+                                <option value="">-- Pilih Asuransi --</option>
                                 @foreach($insurances as $insurance)
                                     <option value="{{ $insurance->id }}" {{ old('insurance_id', $transaction->insurance_id) == $insurance->id ? 'selected' : '' }}>
                                         {{ $insurance->name }}
+                                        @if($insurance->discount_percentage > 0)
+                                            - Diskon {{ number_format($insurance->discount_percentage, 0) }}%
+                                            @if($insurance->max_discount_amount)
+                                                (maks Rp {{ number_format($insurance->max_discount_amount, 0, ',', '.') }})
+                                            @endif
+                                        @endif
                                     </option>
                                 @endforeach
                             </select>
+                            @error('insurance_id')
+                                <p class="text-red-500 text-xs italic mt-1">{{ $message }}</p>
+                            @enderror
                         </div>
 
                         <div class="mb-6">
@@ -44,8 +53,8 @@
                             <div id="services-container">
                                 @foreach($transaction->details as $index => $detail)
                                 <div class="service-row mb-3 p-4 border rounded">
-                                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                        <div class="md:col-span-2">
+                                    <div class="flex gap-2 items-start">
+                                        <div class="flex-1">
                                             <select name="services[{{ $index }}][medical_service_id]" class="shadow border rounded w-full py-2 px-3 text-gray-700" required>
                                                 <option value="">Pilih Layanan</option>
                                                 @foreach($medicalServices as $service)
@@ -55,16 +64,14 @@
                                                 @endforeach
                                             </select>
                                         </div>
-                                        <div class="flex gap-2">
-                                            <input type="number" name="services[{{ $index }}][quantity]" min="1" value="{{ $detail->quantity }}" class="shadow border rounded w-full py-2 px-3 text-gray-700" placeholder="Qty" required>
-                                            <button type="button" class="remove-service bg-red-500 text-white px-3 py-2 rounded hover:bg-red-700" style="{{ count($transaction->details) > 1 ? '' : 'display:none;' }}">X</button>
-                                        </div>
+                                        <input type="hidden" name="services[{{ $index }}][quantity]" value="1">
+                                        <button type="button" class="remove-service bg-red-500 text-white px-3 py-2 rounded hover:bg-red-700" style="{{ count($transaction->details) > 1 ? '' : 'display:none;' }}">✕</button>
                                     </div>
                                 </div>
                                 @endforeach
                             </div>
                             <button type="button" id="add-service" class="bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded mt-2">
-                                Tambah Layanan
+                                + Tambah Layanan
                             </button>
                         </div>
 
@@ -86,26 +93,40 @@
     <script>
         let serviceIndex = {{ count($transaction->details) }};
         
+        // Store medical services data for dynamic rows
+        const medicalServicesData = [
+            @foreach($medicalServices as $service)
+            {
+                id: '{{ $service->id }}',
+                name: '{{ addslashes($service->name) }}',
+                price: '{{ $service->price }}'
+            },
+            @endforeach
+        ];
+        
         document.getElementById('add-service').addEventListener('click', function() {
             const container = document.getElementById('services-container');
             const serviceRow = document.createElement('div');
             serviceRow.className = 'service-row mb-3 p-4 border rounded';
+            
+            // Build options HTML
+            let optionsHTML = '<option value="">Pilih Layanan</option>';
+            medicalServicesData.forEach(service => {
+                const priceFormatted = parseFloat(service.price).toLocaleString('id-ID');
+                optionsHTML += `<option value="${service.id}" data-price="${service.price}">
+                            ${service.name} - Rp ${priceFormatted}
+                        </option>`;
+            });
+            
             serviceRow.innerHTML = `
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div class="md:col-span-2">
+                <div class="flex gap-2 items-start">
+                    <div class="flex-1">
                         <select name="services[${serviceIndex}][medical_service_id]" class="shadow border rounded w-full py-2 px-3 text-gray-700" required>
-                            <option value="">Pilih Layanan</option>
-                            @foreach($medicalServices as $service)
-                                <option value="{{ $service->id }}" data-price="{{ $service->price }}">
-                                    {{ $service->name }} - Rp {{ number_format($service->price, 0, ',', '.') }}
-                                </option>
-                            @endforeach
+                            ${optionsHTML}
                         </select>
                     </div>
-                    <div class="flex gap-2">
-                        <input type="number" name="services[${serviceIndex}][quantity]" min="1" value="1" class="shadow border rounded w-full py-2 px-3 text-gray-700" placeholder="Qty" required>
-                        <button type="button" class="remove-service bg-red-500 text-white px-3 py-2 rounded hover:bg-red-700">X</button>
-                    </div>
+                    <input type="hidden" name="services[${serviceIndex}][quantity]" value="1">
+                    <button type="button" class="remove-service bg-red-500 text-white px-3 py-2 rounded hover:bg-red-700">✕</button>
                 </div>
             `;
             container.appendChild(serviceRow);
